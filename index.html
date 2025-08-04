@@ -52,27 +52,7 @@
             color: var(--primary-black);
         }
 
-        .theme-toggle {
-            position: fixed;
-            top: 30px;
-            right: 30px;
-            background: var(--primary-orange);
-            color: white;
-            border: none;
-            padding: 12px 16px;
-            border-radius: 50px;
-            font-size: 0.9rem;
-            font-weight: 600;
-            cursor: pointer;
-            transition: all 0.3s ease;
-            z-index: 1000;
-            box-shadow: 0 4px 20px rgba(204, 69, 3, 0.3);
-        }
 
-        .theme-toggle:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 6px 25px rgba(204, 69, 3, 0.4);
-        }
 
         /* Landing Section */
         .hero {
@@ -557,13 +537,6 @@
 
         /* Responsive Design */
         @media (max-width: 768px) {
-            .theme-toggle {
-                top: 20px;
-                right: 20px;
-                padding: 10px 14px;
-                font-size: 0.8rem;
-            }
-
             .hero {
                 padding: 40px 20px;
             }
@@ -621,7 +594,7 @@
     </style>
 </head>
 <body class="theme-dark">
-    <button class="theme-toggle" onclick="toggleTheme()">🌙 Mode Sombre</button>
+
 
     <!-- Landing Page -->
     <section class="hero" id="heroSection">
@@ -794,21 +767,6 @@
                 exchangeToken(code);
             }
         });
-
-        function toggleTheme() {
-            const body = document.body;
-            const button = document.querySelector('.theme-toggle');
-            
-            if (currentTheme === 'dark') {
-                body.className = 'theme-light';
-                button.textContent = '🌞 Mode Clair';
-                currentTheme = 'light';
-            } else {
-                body.className = 'theme-dark';
-                button.textContent = '🌙 Mode Sombre';
-                currentTheme = 'dark';
-            }
-        }
 
         function updateActivityCount(value) {
             const text = value == 0 ? 'Aucune activité' : value == 1 ? '1 activité' : `${value} activités`;
