@@ -877,4 +877,416 @@
             try {
                 const month = parseInt(document.getElementById('monthSelect').value);
                 const year = parseInt(document.getElementById('yearSelect').value);
-                await fetchActivities(month
+                await fetchActivities(month, year);
+                updateStatsPreview();
+            } catch (error) {
+                console.error('Erreur lors du chargement de l\'aperçu:', error);
+            }
+        }
+
+        function updateStatsPreview() {
+            if (activities.length === 0) return;
+            
+            const filteredActivities = getFilteredActivities();
+            const totalDistance = filteredActivities.reduce((sum, act) => sum + (act.distance || 0), 0);
+            const totalTime = filteredActivities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
+            
+            const statsContent = `
+                ${filteredActivities.length} activités • 
+                ${(totalDistance / 1000).toFixed(1)}km • 
+                ${Math.floor(totalTime / 3600)}h${Math.floor((totalTime % 3600) / 60).toString().padStart(2, '0')}
+            `;
+            
+            document.getElementById('statsContent').textContent = statsContent;
+            document.getElementById('statsPreview').style.display = 'block';
+        }
+
+        function getFilteredActivities() {
+            const allSportsChecked = document.getElementById('all-sports').checked;
+            
+            if (allSportsChecked) {
+                return activities;
+            }
+            
+            const selectedSports = [];
+            document.querySelectorAll('.sport-checkbox:checked').forEach(checkbox => {
+                selectedSports.push(checkbox.value);
+            });
+            
+            if (selectedSports.length === 0) {
+                return activities;
+            }
+            
+            return activities.filter(activity => {
+                return selectedSports.includes(activity.sport_type) || 
+                       (selectedSports.includes('Other') && !['Ride', 'Run', 'Swim', 'Hike'].includes(activity.sport_type));
+            });
+        }
+
+        async function generateRecap() {
+            if (!accessToken) {
+                showError('Veuillez vous connecter à Strava d\'abord');
+                return;
+            }
+
+            const month = parseInt(document.getElementById('monthSelect').value);
+            const year = parseInt(document.getElementById('yearSelect').value);
+
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('generateBtn').disabled = true;
+            document.getElementById('error').style.display = 'none';
+
+            try {
+                await fetchActivities(month, year);
+                drawRecap(month, year);
+            } catch (error) {
+                showError('Erreur lors de la génération: ' + error.message);
+            } finally {
+                document.getElementById('loading').style.display = 'none';
+                document.getElementById('generateBtn').disabled = false;
+            }
+        }
+
+        async function fetchActivities(month, year) {
+            const startOfMonth = new Date(year, month - 1, 1);
+            const endOfMonth = new Date(year, month, 0, 23, 59, 59);
+            
+            const after = Math.floor(startOfMonth.getTime() / 1000);
+            const before = Math.floor(endOfMonth.getTime() / 1000);
+
+            const response = await fetch(
+                `https://www.strava.com/api/v3/athlete/activities?after=${after}&before=${before}&per_page=200`,
+                {
+                    headers: {
+                        'Authorization': `Bearer ${accessToken}`
+                    }
+                }
+            );
+
+            if (!response.ok) {
+                throw new Error('Erreur lors de la récupération des activités');
+            }
+
+            activities = await response.json();
+        }
+
+        function drawRecap(month, year) {
+            const canvas = document.getElementById('recapCanvas');
+            const ctx = canvas.getContext('2d');
+
+            const filteredActivities = getFilteredActivities();
+            const maxActivities = parseInt(document.getElementById('maxActivities').value);
+            const activitiesToShow = filteredActivities.slice(0, maxActivities);
+            const { cols, rows } = calculateGridDimensions(activitiesToShow.length);
+
+            // Couleurs selon le thème
+            const isLightTheme = currentTheme === 'light';
+            const bgColor = isLightTheme ? '#FFFFFF' : '#0a0a0a';
+            const textColor = isLightTheme ? '#0F0F10' : '#FFFFFF';
+            const traceColor = '#CC4503';
+
+            // Fond
+            ctx.fillStyle = bgColor;
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Titre principal
+            ctx.fillStyle = textColor;
+            ctx.font = '300 48px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillText('Récap du mois', canvas.width / 2, 150);
+
+            // Mois
+            const monthNames = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
+                             'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
+            ctx.font = '700 72px Inter';
+            ctx.fillText(monthNames[month], canvas.width / 2, 230);
+
+            if (activitiesToShow.length === 0) {
+                ctx.font = '400 32px Inter';
+                ctx.fillStyle = '#888888';
+                ctx.fillText('Aucune activité trouvée', canvas.width / 2, 600);
+                
+                drawStats(ctx, filteredActivities, canvas.width / 2, 800, textColor);
+            } else {
+                // Zone pour les tracés
+                const gridStartY = 320;
+                const maxGridWidth = 900;
+                const maxGridHeight = 900;
+                
+                const cellSize = Math.min(maxGridWidth / cols, maxGridHeight / rows, 180);
+                const gridWidth = cols * cellSize;
+                const gridHeight = rows * cellSize;
+                const gridStartX = (canvas.width - gridWidth) / 2;
+
+                // Dessiner les tracés
+                activitiesToShow.forEach((activity, index) => {
+                    const row = Math.floor(index / cols);
+                    const col = index % cols;
+                    const x = gridStartX + col * cellSize;
+                    const y = gridStartY + row * cellSize;
+                    
+                    drawActivityTrace(ctx, activity, x, y, cellSize, traceColor);
+                });
+
+                // Statistiques
+                const statsY = gridStartY + gridHeight + 80;
+                drawStats(ctx, filteredActivities, canvas.width / 2, statsY, textColor);
+            }
+
+            // Générer l'URL de l'image
+            generatedImageUrl = canvas.toDataURL('image/png');
+
+            // Afficher le canvas et les boutons
+            document.getElementById('canvasContainer').style.display = 'block';
+            document.getElementById('actionButtons').style.display = 'flex';
+        }
+
+        function drawStats(ctx, activities, centerX, startY, textColor) {
+            const totalDistance = activities.reduce((sum, act) => sum + (act.distance || 0), 0);
+            const totalTime = activities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
+            const totalElevation = activities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
+
+            ctx.font = '600 42px Inter';
+            ctx.fillStyle = textColor;
+            ctx.textAlign = 'left';
+            
+            const leftX = centerX - 200;
+            const rightX = centerX + 50;
+            
+            ctx.fillText(`${activities.length} activités`, leftX, startY);
+            ctx.fillText(`${(totalDistance / 1000).toFixed(1)}km`, rightX, startY);
+            
+            const hours = Math.floor(totalTime / 3600);
+            ctx.fillText(`${hours}h`, leftX, startY + 80);
+            ctx.fillText(`${Math.round(totalElevation)}m dénivelé`, rightX, startY + 80);
+
+            // Logo Strava
+            ctx.font = '400 32px Inter';
+            ctx.textAlign = 'center';
+            ctx.fillStyle = '#888888';
+            ctx.fillText('@strava', centerX, startY + 200);
+        }
+
+        function drawActivityTrace(ctx, activity, x, y, size, color) {
+            if (!activity.map || !activity.map.summary_polyline) {
+                drawGenericTrace(ctx, x, y, size, color);
+                return;
+            }
+
+            const points = decodePolyline(activity.map.summary_polyline);
+            if (points.length < 2) {
+                drawGenericTrace(ctx, x, y, size, color);
+                return;
+            }
+
+            let minLat = points[0][0], maxLat = points[0][0];
+            let minLng = points[0][1], maxLng = points[0][1];
+            
+            points.forEach(point => {
+                minLat = Math.min(minLat, point[0]);
+                maxLat = Math.max(maxLat, point[0]);
+                minLng = Math.min(minLng, point[1]);
+                maxLng = Math.max(maxLng, point[1]);
+            });
+
+            const padding = size * 0.1;
+            const drawWidth = size - 2 * padding;
+            const drawHeight = size - 2 * padding;
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+
+            points.forEach((point, index) => {
+                const px = x + padding + ((point[1] - minLng) / (maxLng - minLng)) * drawWidth;
+                const py = y + padding + ((maxLat - point[0]) / (maxLat - minLat)) * drawHeight;
+                
+                if (index === 0) {
+                    ctx.moveTo(px, py);
+                } else {
+                    ctx.lineTo(px, py);
+                }
+            });
+
+            ctx.stroke();
+        }
+
+        function drawGenericTrace(ctx, x, y, size, color) {
+            const padding = size * 0.2;
+            const points = [];
+            
+            for (let i = 0; i < 8; i++) {
+                points.push([
+                    x + padding + Math.random() * (size - 2 * padding),
+                    y + padding + Math.random() * (size - 2 * padding)
+                ]);
+            }
+
+            ctx.strokeStyle = color;
+            ctx.lineWidth = 3;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+
+            points.forEach((point, index) => {
+                if (index === 0) {
+                    ctx.moveTo(point[0], point[1]);
+                } else {
+                    ctx.lineTo(point[0], point[1]);
+                }
+            });
+
+            ctx.stroke();
+        }
+
+        function decodePolyline(str) {
+            let index = 0, lat = 0, lng = 0;
+            const coordinates = [];
+            let shift = 0, result = 0, byte = null;
+
+            while (index < str.length) {
+                byte = null;
+                shift = 0;
+                result = 0;
+
+                do {
+                    byte = str.charCodeAt(index++) - 63;
+                    result |= (byte & 0x1f) << shift;
+                    shift += 5;
+                } while (byte >= 0x20);
+
+                const deltaLat = ((result & 1) ? ~(result >> 1) : (result >> 1));
+                lat += deltaLat;
+
+                shift = 0;
+                result = 0;
+
+                do {
+                    byte = str.charCodeAt(index++) - 63;
+                    result |= (byte & 0x1f) << shift;
+                    shift += 5;
+                } while (byte >= 0x20);
+
+                const deltaLng = ((result & 1) ? ~(result >> 1) : (result >> 1));
+                lng += deltaLng;
+
+                coordinates.push([lat / 1e5, lng / 1e5]);
+            }
+
+            return coordinates;
+        }
+
+        // Fonctions de partage et sauvegarde
+        function saveToGallery() {
+            if (!generatedImageUrl) {
+                showError('Aucun visuel généré à sauvegarder');
+                return;
+            }
+
+            const link = document.createElement('a');
+            link.download = `strava-recap-${new Date().toISOString().slice(0, 10)}.png`;
+            link.href = generatedImageUrl;
+            link.click();
+        }
+
+        function downloadImage(format) {
+            if (!generatedImageUrl) {
+                showError('Aucun visuel généré à télécharger');
+                return;
+            }
+
+            const canvas = document.getElementById('recapCanvas');
+            const link = document.createElement('a');
+            
+            if (format === 'png') {
+                link.download = `strava-recap-${new Date().toISOString().slice(0, 10)}.png`;
+                link.href = canvas.toDataURL();
+            } else {
+                link.download = `strava-recap-${new Date().toISOString().slice(0, 10)}.jpg`;
+                link.href = canvas.toDataURL('image/jpeg', 0.9);
+            }
+            
+            link.click();
+        }
+
+        function shareToInstagram() {
+            if (!generatedImageUrl) {
+                showError('Générez d\'abord votre visuel');
+                return;
+            }
+
+            // Vérifier si on est sur mobile
+            if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
+                // Tenter d'ouvrir l'app Instagram
+                window.open('instagram://story-camera', '_blank');
+                
+                // Fallback: télécharger l'image
+                setTimeout(() => {
+                    downloadImage('png');
+                }, 1000);
+            } else {
+                // Sur desktop, télécharger l'image avec instructions
+                downloadImage('png');
+                alert('Image téléchargée ! Vous pouvez maintenant l\'importer dans vos stories Instagram depuis votre téléphone.');
+            }
+        }
+
+        function shareToTwitter() {
+            const text = encodeURIComponent('Mon récapitulatif Strava du mois ! 🚴‍♂️📊 #Strava #Cycling #Running #Fitness #StravaStories');
+            const url = 'https://twitter.com/intent/tweet?text=' + text;
+            
+            downloadImage('png');
+            window.open(url, '_blank', 'width=600,height=400');
+        }
+
+        function shareToFacebook() {
+            const url = encodeURIComponent(window.location.href);
+            const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
+            
+            downloadImage('png');
+            window.open(shareUrl, '_blank', 'width=600,height=400');
+        }
+
+        function shareGeneric() {
+            if (navigator.share && generatedImageUrl) {
+                // Convertir l'image en blob pour le partage natif
+                fetch(generatedImageUrl)
+                    .then(res => res.blob())
+                    .then(blob => {
+                        const file = new File([blob], 'strava-recap.png', { type: 'image/png' });
+                        
+                        navigator.share({
+                            title: 'Mon récapitulatif Strava',
+                            text: 'Regardez mon récapitulatif Strava du mois !',
+                            files: [file]
+                        });
+                    })
+                    .catch(() => {
+                        // Fallback si le partage échoue
+                        downloadImage('png');
+                    });
+            } else {
+                // Fallback pour les navigateurs qui ne supportent pas navigator.share
+                downloadImage('png');
+                
+                if (navigator.clipboard) {
+                    navigator.clipboard.writeText(window.location.href);
+                    alert('Lien copié ! Partagez votre récapitulatif avec vos amis.');
+                }
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+    </script>
+</body>
+</html>
