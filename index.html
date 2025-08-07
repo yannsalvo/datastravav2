@@ -1091,7 +1091,6 @@
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.beginPath();
-
             points.forEach((point, index) => {
                 if (index === 0) {
                     ctx.moveTo(point[0], point[1]);
@@ -1099,7 +1098,6 @@
                     ctx.lineTo(point[0], point[1]);
                 }
             });
-
             ctx.stroke();
         }
 
@@ -1112,7 +1110,6 @@
                 byte = null;
                 shift = 0;
                 result = 0;
-
                 do {
                     byte = str.charCodeAt(index++) - 63;
                     result |= (byte & 0x1f) << shift;
@@ -1121,10 +1118,8 @@
 
                 const deltaLat = ((result & 1) ? ~(result >> 1) : (result >> 1));
                 lat += deltaLat;
-
                 shift = 0;
                 result = 0;
-
                 do {
                     byte = str.charCodeAt(index++) - 63;
                     result |= (byte & 0x1f) << shift;
