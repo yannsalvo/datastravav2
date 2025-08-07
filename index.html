@@ -935,61 +935,62 @@
             const filteredActivities = getFilteredActivities();
             const maxActivities = parseInt(document.getElementById('maxActivities').value);
             const activitiesToShow = filteredActivities.slice(0, maxActivities);
-            const { cols, rows } = calculateGridDimensions(activitiesToShow.length);
 
-            // Couleurs selon le thème
-            const isLightTheme = currentTheme === 'light';
-            const bgColor = isLightTheme ? '#FFFFFF' : '#0a0a0a';
-            const textColor = isLightTheme ? '#0F0F10' : '#FFFFFF';
-            const traceColor = '#CC4503';
-
-            // Fond
-            ctx.fillStyle = bgColor;
+            // Structure CSS Figma - fond noir pur
+            ctx.fillStyle = '#000000';
             ctx.fillRect(0, 0, canvas.width, canvas.height);
 
-            // Titre principal
-            ctx.fillStyle = textColor;
-            ctx.font = '300 48px Inter';
+            const topPadding = 150;
+            let currentY = topPadding;
+
+            // Section 1: Titre principal
+            ctx.fillStyle = '#FFFFFF';
+            ctx.font = '400 56px Inter';
             ctx.textAlign = 'center';
-            ctx.fillText('Récap du mois', canvas.width / 2, 150);
+            ctx.fillText('Recap of the month', canvas.width / 2, currentY + 56);
 
-            // Mois
-            const monthNames = ['', 'Janvier', 'Février', 'Mars', 'Avril', 'Mai', 'Juin', 
-                             'Juillet', 'Août', 'Septembre', 'Octobre', 'Novembre', 'Décembre'];
-            ctx.font = '700 72px Inter';
-            ctx.fillText(monthNames[month], canvas.width / 2, 230);
+            currentY += 56 + 40;
 
-            if (activitiesToShow.length === 0) {
-                ctx.font = '400 32px Inter';
-                ctx.fillStyle = '#888888';
-                ctx.fillText('Aucune activité trouvée', canvas.width / 2, 600);
-                
-                drawStats(ctx, filteredActivities, canvas.width / 2, 800, textColor);
-            } else {
-                // Zone pour les tracés
-                const gridStartY = 320;
-                const maxGridWidth = 900;
-                const maxGridHeight = 900;
-                
-                const cellSize = Math.min(maxGridWidth / cols, maxGridHeight / rows, 180);
-                const gridWidth = cols * cellSize;
-                const gridHeight = rows * cellSize;
-                const gridStartX = (canvas.width - gridWidth) / 2;
+            // Section 2: Sous-titre italique - nom du mois dynamique
+            const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+            ctx.font = 'italic 600 48px Inter';
+            const currentMonthName = monthNames[month];
+            ctx.fillText(`Month [${currentMonthName}]`, canvas.width / 2, currentY + 48);
 
-                // Dessiner les tracés
-                activitiesToShow.forEach((activity, index) => {
-                    const row = Math.floor(index / cols);
-                    const col = index % cols;
-                    const x = gridStartX + col * cellSize;
-                    const y = gridStartY + row * cellSize;
-                    
-                    drawActivityTrace(ctx, activity, x, y, cellSize, traceColor);
-                });
+            currentY += 48 + 100;
 
-                // Statistiques
-                const statsY = gridStartY + gridHeight + 80;
-                drawStats(ctx, filteredActivities, canvas.width / 2, statsY, textColor);
+            // Section 3: Grille des tracés - Layout Figma centré
+            const { cols, rows } = calculateGridDimensions(activitiesToShow.length);
+            const cellWidth = 200;
+            const cellHeight = 100;
+            const gridWidth = cols * cellWidth;
+            const gridHeight = rows * cellHeight;
+            const gridStartX = (canvas.width - gridWidth) / 2;
+            const gridStartY = currentY;
+
+            const totalCells = cols * rows;
+            for (let i = 0; i < totalCells; i++) {
+                const row = Math.floor(i / cols);
+                const col = i % cols;
+                const x = gridStartX + col * cellWidth;
+                const y = gridStartY + row * cellHeight;
+
+                if (i < activitiesToShow.length) {
+                    drawFigmaTrace(ctx, activitiesToShow[i], x, y, cellWidth, cellHeight);
+                } else {
+                    drawEmptyTrace(ctx, x, y, cellWidth, cellHeight);
+                }
             }
+
+            currentY = gridStartY + gridHeight + 100;
+
+            // Section 4: Statistiques
+            drawCSSStats(ctx, filteredActivities, canvas.width / 2, currentY);
+
+            currentY += 120 + 50;
+
+            // Section 5: Logo Strava
+            drawCSSStravaLogo(ctx, canvas.width / 2, currentY);
 
             // Générer l'URL de l'image
             generatedImageUrl = canvas.toDataURL('image/png');
@@ -999,47 +1000,87 @@
             document.getElementById('actionButtons').style.display = 'flex';
         }
 
-        function drawStats(ctx, activities, centerX, startY, textColor) {
+        function drawCSSStats(ctx, activities, centerX, startY) {
             const totalDistance = activities.reduce((sum, act) => sum + (act.distance || 0), 0);
             const totalTime = activities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
             const totalElevation = activities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
 
-            ctx.font = '600 42px Inter';
-            ctx.fillStyle = textColor;
-            ctx.textAlign = 'left';
-            
-            const leftX = centerX - 200;
-            const rightX = centerX + 50;
-            
-            ctx.fillText(`${activities.length} activités`, leftX, startY);
-            ctx.fillText(`${(totalDistance / 1000).toFixed(1)}km`, rightX, startY);
-            
-            const hours = Math.floor(totalTime / 3600);
-            ctx.fillText(`${hours}h`, leftX, startY + 80);
-            ctx.fillText(`${Math.round(totalElevation)}m dénivelé`, rightX, startY + 80);
-
-            // Logo Strava
-            ctx.font = '400 32px Inter';
+            ctx.font = 'italic 700 42px Inter';
+            ctx.fillStyle = '#FFFFFF';
             ctx.textAlign = 'center';
-            ctx.fillStyle = '#888888';
-            ctx.fillText('@strava', centerX, startY + 200);
+
+            const statsWidth = 600;
+            const statsStartX = centerX - statsWidth / 2;
+
+            ctx.textAlign = 'left';
+            ctx.fillText(`${activities.length} activities`, statsStartX, startY);
+            ctx.textAlign = 'right';
+            ctx.fillText(`${Math.round(totalDistance / 1000)} km`, statsStartX + statsWidth, startY);
+
+            ctx.textAlign = 'left';
+            const hours = Math.floor(totalTime / 3600);
+            ctx.fillText(`${hours} hours`, statsStartX, startY + 60);
+            ctx.textAlign = 'right';
+            ctx.fillText(`${Math.round(totalElevation)} elevation`, statsStartX + statsWidth, startY + 60);
         }
 
-        function drawActivityTrace(ctx, activity, x, y, size, color) {
-            if (!activity.map || !activity.map.summary_polyline) {
-                drawGenericTrace(ctx, x, y, size, color);
-                return;
+        function drawCSSStravaLogo(ctx, centerX, y) {
+            const logoSize = 40;
+            const logoX = centerX - logoSize / 2;
+
+            ctx.fillStyle = '#FFFFFF';
+
+            ctx.beginPath();
+            ctx.moveTo(logoX, y + logoSize);
+            ctx.lineTo(logoX + logoSize * 0.3, y);
+            ctx.lineTo(logoX + logoSize * 0.6, y + logoSize * 0.4);
+            ctx.lineTo(logoX + logoSize * 0.4, y + logoSize * 0.4);
+            ctx.lineTo(logoX + logoSize, y + logoSize);
+            ctx.closePath();
+            ctx.fill();
+        }
+
+        function drawFigmaTrace(ctx, activity, x, y, width, height) {
+            const centerX = x + width / 2;
+            const centerY = y + height / 2;
+            const traceWidth = width * 0.7;
+            const traceHeight = height * 0.4;
+
+            ctx.strokeStyle = '#CC4503';
+            ctx.lineWidth = 4;
+            ctx.lineCap = 'round';
+            ctx.lineJoin = 'round';
+
+            if (activity.map && activity.map.summary_polyline) {
+                const points = decodePolyline(activity.map.summary_polyline);
+                if (points.length >= 2) {
+                    drawRealTrace(ctx, points, x, y, width, height);
+                    return;
+                }
             }
 
-            const points = decodePolyline(activity.map.summary_polyline);
-            if (points.length < 2) {
-                drawGenericTrace(ctx, x, y, size, color);
-                return;
-            }
+            ctx.beginPath();
+            const startX = centerX - traceWidth / 2;
+            const endX = centerX + traceWidth / 2;
+            const startY = centerY + (Math.random() - 0.5) * traceHeight;
+            const endY = centerY + (Math.random() - 0.5) * traceHeight;
+
+            const cp1X = startX + traceWidth * 0.3;
+            const cp1Y = startY + (Math.random() - 0.5) * traceHeight;
+            const cp2X = startX + traceWidth * 0.7;
+            const cp2Y = endY + (Math.random() - 0.5) * traceHeight;
+
+            ctx.moveTo(startX, startY);
+            ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
+            ctx.stroke();
+        }
+
+        function drawRealTrace(ctx, points, x, y, width, height) {
+            if (points.length < 2) return;
 
             let minLat = points[0][0], maxLat = points[0][0];
             let minLng = points[0][1], maxLng = points[0][1];
-            
+
             points.forEach(point => {
                 minLat = Math.min(minLat, point[0]);
                 maxLat = Math.max(maxLat, point[0]);
@@ -1047,12 +1088,12 @@
                 maxLng = Math.max(maxLng, point[1]);
             });
 
-            const padding = size * 0.1;
-            const drawWidth = size - 2 * padding;
-            const drawHeight = size - 2 * padding;
+            const padding = Math.min(width, height) * 0.15;
+            const drawWidth = width - 2 * padding;
+            const drawHeight = height - 2 * padding;
 
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 3;
+            ctx.strokeStyle = '#CC4503';
+            ctx.lineWidth = 4;
             ctx.lineCap = 'round';
             ctx.lineJoin = 'round';
             ctx.beginPath();
@@ -1060,7 +1101,7 @@
             points.forEach((point, index) => {
                 const px = x + padding + ((point[1] - minLng) / (maxLng - minLng)) * drawWidth;
                 const py = y + padding + ((maxLat - point[0]) / (maxLat - minLat)) * drawHeight;
-                
+
                 if (index === 0) {
                     ctx.moveTo(px, py);
                 } else {
@@ -1071,32 +1112,8 @@
             ctx.stroke();
         }
 
-        function drawGenericTrace(ctx, x, y, size, color) {
-            const padding = size * 0.2;
-            const points = [];
-            
-            for (let i = 0; i < 8; i++) {
-                points.push([
-                    x + padding + Math.random() * (size - 2 * padding),
-                    y + padding + Math.random() * (size - 2 * padding)
-                ]);
-            }
-
-            ctx.strokeStyle = color;
-            ctx.lineWidth = 3;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-
-            points.forEach((point, index) => {
-                if (index === 0) {
-                    ctx.moveTo(point[0], point[1]);
-                } else {
-                    ctx.lineTo(point[0], point[1]);
-                }
-            });
-
-            ctx.stroke();
+        function drawEmptyTrace(ctx, x, y, width, height) {
+            return;
         }
 
         function decodePolyline(str) {
