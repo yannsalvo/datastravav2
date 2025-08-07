@@ -8,9 +8,6 @@
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@200;300;400;500;600;700;800;900&family=Poppins:wght@200;300;400;500;600;700;800;900&display=swap" rel="stylesheet">
     
-    <!-- Vercel Analytics -->
-    <script defer src="https://cdn.vercel-insights.com/v1/script.debug.js"></script>
-    
     <style>
         :root {
             --primary-orange: #CC4503;
@@ -51,8 +48,6 @@
             background: var(--primary-white);
             color: var(--primary-black);
         }
-
-
 
         /* Landing Section */
         .hero {
@@ -595,7 +590,6 @@
 </head>
 <body class="theme-dark">
 
-
     <!-- Landing Page -->
     <section class="hero" id="heroSection">
         <div class="hero-content">
@@ -642,7 +636,7 @@
                     <div class="form-group">
                         <label for="monthSelect">Période</label>
                         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
-                            <select id="monthSelect">
+                            <select id="monthSelect" onchange="updateStatsPreview()">
                                 <option value="1">Janvier</option>
                                 <option value="2">Février</option>
                                 <option value="3">Mars</option>
@@ -656,7 +650,7 @@
                                 <option value="11">Novembre</option>
                                 <option value="12">Décembre</option>
                             </select>
-                            <select id="yearSelect">
+                            <select id="yearSelect" onchange="updateStatsPreview()">
                                 <option value="2023">2023</option>
                                 <option value="2024">2024</option>
                                 <option value="2025" selected>2025</option>
@@ -685,19 +679,19 @@
                                 <label for="all-sports">Tous</label>
                             </div>
                             <div class="sport-option">
-                                <input type="checkbox" id="sport-ride" class="sport-checkbox" value="Ride">
+                                <input type="checkbox" id="sport-ride" class="sport-checkbox" value="Ride" onchange="updateStatsPreview()">
                                 <label for="sport-ride">🚴 Vélo</label>
                             </div>
                             <div class="sport-option">
-                                <input type="checkbox" id="sport-run" class="sport-checkbox" value="Run">
+                                <input type="checkbox" id="sport-run" class="sport-checkbox" value="Run" onchange="updateStatsPreview()">
                                 <label for="sport-run">🏃 Course</label>
                             </div>
                             <div class="sport-option">
-                                <input type="checkbox" id="sport-swim" class="sport-checkbox" value="Swim">
+                                <input type="checkbox" id="sport-swim" class="sport-checkbox" value="Swim" onchange="updateStatsPreview()">
                                 <label for="sport-swim">🏊 Natation</label>
                             </div>
                             <div class="sport-option">
-                                <input type="checkbox" id="sport-hike" class="sport-checkbox" value="Hike">
+                                <input type="checkbox" id="sport-hike" class="sport-checkbox" value="Hike" onchange="updateStatsPreview()">
                                 <label for="sport-hike">🥾 Randonnée</label>
                             </div>
                         </div>
@@ -726,11 +720,8 @@
         </div>
 
         <div class="action-buttons" id="actionButtons">
-            <button class="action-btn" onclick="saveToGallery()">
-                💾 Sauvegarder en galerie
-            </button>
             <button class="action-btn" onclick="downloadImage('png')">
-                📥 Télécharger PNG
+                💾 Télécharger PNG
             </button>
             <button class="social-btn instagram" onclick="shareToInstagram()">
                 📸 Story Instagram
@@ -780,6 +771,8 @@
             sportCheckboxes.forEach(checkbox => {
                 checkbox.checked = allSportsCheckbox.checked;
             });
+            
+            updateStatsPreview();
         }
 
         function calculateGridDimensions(activityCount) {
@@ -872,396 +865,4 @@
             });
             
             if (selectedSports.length === 0) {
-                return activities;
-            }
-            
-            return activities.filter(activity => {
-                return selectedSports.includes(activity.sport_type) || 
-                       (selectedSports.includes('Other') && !['Ride', 'Run', 'Swim', 'Hike'].includes(activity.sport_type));
-            });
-        }
-
-        async function generateRecap() {
-            if (!accessToken) {
-                showError('Veuillez vous connecter à Strava d\'abord');
-                return;
-            }
-
-            const month = parseInt(document.getElementById('monthSelect').value);
-            const year = parseInt(document.getElementById('yearSelect').value);
-
-            document.getElementById('loading').style.display = 'block';
-            document.getElementById('generateBtn').disabled = true;
-            document.getElementById('error').style.display = 'none';
-
-            try {
-                await fetchActivities(month, year);
-                drawRecap(month, year);
-            } catch (error) {
-                showError('Erreur lors de la génération: ' + error.message);
-            } finally {
-                document.getElementById('loading').style.display = 'none';
-                document.getElementById('generateBtn').disabled = false;
-            }
-        }
-
-        async function fetchActivities(month, year) {
-            const startOfMonth = new Date(year, month - 1, 1);
-            const endOfMonth = new Date(year, month, 0, 23, 59, 59);
-            
-            const after = Math.floor(startOfMonth.getTime() / 1000);
-            const before = Math.floor(endOfMonth.getTime() / 1000);
-
-            const response = await fetch(
-                `https://www.strava.com/api/v3/athlete/activities?after=${after}&before=${before}&per_page=200`,
-                {
-                    headers: {
-                        'Authorization': `Bearer ${accessToken}`
-                    }
-                }
-            );
-
-            if (!response.ok) {
-                throw new Error('Erreur lors de la récupération des activités');
-            }
-
-            activities = await response.json();
-        }
-
-        function drawRecap(month, year) {
-            const canvas = document.getElementById('recapCanvas');
-            const ctx = canvas.getContext('2d');
-
-            const filteredActivities = getFilteredActivities();
-            const maxActivities = parseInt(document.getElementById('maxActivities').value);
-            const activitiesToShow = filteredActivities.slice(0, maxActivities);
-
-            // Structure CSS Figma - fond noir pur
-            ctx.fillStyle = '#000000';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-
-            const topPadding = 150;
-            let currentY = topPadding;
-
-            // Section 1: Titre principal
-            ctx.fillStyle = '#FFFFFF';
-            ctx.font = '400 56px Inter';
-            ctx.textAlign = 'center';
-            ctx.fillText('Recap of the month', canvas.width / 2, currentY + 56);
-
-            currentY += 56 + 40;
-
-            // Section 2: Sous-titre italique - nom du mois dynamique
-            const monthNames = ['', 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
-            ctx.font = 'italic 600 48px Inter';
-            const currentMonthName = monthNames[month];
-            ctx.fillText(`Month [${currentMonthName}]`, canvas.width / 2, currentY + 48);
-
-            currentY += 48 + 100;
-
-            // Section 3: Grille des tracés - Layout Figma centré
-            const { cols, rows } = calculateGridDimensions(activitiesToShow.length);
-            const cellWidth = 200;
-            const cellHeight = 100;
-            const gridWidth = cols * cellWidth;
-            const gridHeight = rows * cellHeight;
-            const gridStartX = (canvas.width - gridWidth) / 2;
-            const gridStartY = currentY;
-
-            const totalCells = cols * rows;
-            for (let i = 0; i < totalCells; i++) {
-                const row = Math.floor(i / cols);
-                const col = i % cols;
-                const x = gridStartX + col * cellWidth;
-                const y = gridStartY + row * cellHeight;
-
-                if (i < activitiesToShow.length) {
-                    drawFigmaTrace(ctx, activitiesToShow[i], x, y, cellWidth, cellHeight);
-                } else {
-                    drawEmptyTrace(ctx, x, y, cellWidth, cellHeight);
-                }
-            }
-
-            currentY = gridStartY + gridHeight + 100;
-
-            // Section 4: Statistiques
-            drawCSSStats(ctx, filteredActivities, canvas.width / 2, currentY);
-
-            currentY += 120 + 50;
-
-            // Section 5: Logo Strava
-            drawCSSStravaLogo(ctx, canvas.width / 2, currentY);
-
-            // Générer l'URL de l'image
-            generatedImageUrl = canvas.toDataURL('image/png');
-
-            // Afficher le canvas et les boutons
-            document.getElementById('canvasContainer').style.display = 'block';
-            document.getElementById('actionButtons').style.display = 'flex';
-        }
-
-        function drawCSSStats(ctx, activities, centerX, startY) {
-            const totalDistance = activities.reduce((sum, act) => sum + (act.distance || 0), 0);
-            const totalTime = activities.reduce((sum, act) => sum + (act.moving_time || 0), 0);
-            const totalElevation = activities.reduce((sum, act) => sum + (act.total_elevation_gain || 0), 0);
-
-            ctx.font = 'italic 700 42px Inter';
-            ctx.fillStyle = '#FFFFFF';
-            ctx.textAlign = 'center';
-
-            const statsWidth = 600;
-            const statsStartX = centerX - statsWidth / 2;
-
-            ctx.textAlign = 'left';
-            ctx.fillText(`${activities.length} activities`, statsStartX, startY);
-            ctx.textAlign = 'right';
-            ctx.fillText(`${Math.round(totalDistance / 1000)} km`, statsStartX + statsWidth, startY);
-
-            ctx.textAlign = 'left';
-            const hours = Math.floor(totalTime / 3600);
-            ctx.fillText(`${hours} hours`, statsStartX, startY + 60);
-            ctx.textAlign = 'right';
-            ctx.fillText(`${Math.round(totalElevation)} elevation`, statsStartX + statsWidth, startY + 60);
-        }
-
-        function drawCSSStravaLogo(ctx, centerX, y) {
-            const logoSize = 40;
-            const logoX = centerX - logoSize / 2;
-
-            ctx.fillStyle = '#FFFFFF';
-
-            ctx.beginPath();
-            ctx.moveTo(logoX, y + logoSize);
-            ctx.lineTo(logoX + logoSize * 0.3, y);
-            ctx.lineTo(logoX + logoSize * 0.6, y + logoSize * 0.4);
-            ctx.lineTo(logoX + logoSize * 0.4, y + logoSize * 0.4);
-            ctx.lineTo(logoX + logoSize, y + logoSize);
-            ctx.closePath();
-            ctx.fill();
-        }
-
-        function drawFigmaTrace(ctx, activity, x, y, width, height) {
-            const centerX = x + width / 2;
-            const centerY = y + height / 2;
-            const traceWidth = width * 0.7;
-            const traceHeight = height * 0.4;
-
-            ctx.strokeStyle = '#CC4503';
-            ctx.lineWidth = 4;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-
-            if (activity.map && activity.map.summary_polyline) {
-                const points = decodePolyline(activity.map.summary_polyline);
-                if (points.length >= 2) {
-                    drawRealTrace(ctx, points, x, y, width, height);
-                    return;
-                }
-            }
-
-            ctx.beginPath();
-            const startX = centerX - traceWidth / 2;
-            const endX = centerX + traceWidth / 2;
-            const startY = centerY + (Math.random() - 0.5) * traceHeight;
-            const endY = centerY + (Math.random() - 0.5) * traceHeight;
-
-            const cp1X = startX + traceWidth * 0.3;
-            const cp1Y = startY + (Math.random() - 0.5) * traceHeight;
-            const cp2X = startX + traceWidth * 0.7;
-            const cp2Y = endY + (Math.random() - 0.5) * traceHeight;
-
-            ctx.moveTo(startX, startY);
-            ctx.bezierCurveTo(cp1X, cp1Y, cp2X, cp2Y, endX, endY);
-            ctx.stroke();
-        }
-
-        function drawRealTrace(ctx, points, x, y, width, height) {
-            if (points.length < 2) return;
-
-            let minLat = points[0][0], maxLat = points[0][0];
-            let minLng = points[0][1], maxLng = points[0][1];
-
-            points.forEach(point => {
-                minLat = Math.min(minLat, point[0]);
-                maxLat = Math.max(maxLat, point[0]);
-                minLng = Math.min(minLng, point[1]);
-                maxLng = Math.max(maxLng, point[1]);
-            });
-
-            const padding = Math.min(width, height) * 0.15;
-            const drawWidth = width - 2 * padding;
-            const drawHeight = height - 2 * padding;
-
-            ctx.strokeStyle = '#CC4503';
-            ctx.lineWidth = 4;
-            ctx.lineCap = 'round';
-            ctx.lineJoin = 'round';
-            ctx.beginPath();
-
-            points.forEach((point, index) => {
-                const px = x + padding + ((point[1] - minLng) / (maxLng - minLng)) * drawWidth;
-                const py = y + padding + ((maxLat - point[0]) / (maxLat - minLat)) * drawHeight;
-
-                if (index === 0) {
-                    ctx.moveTo(px, py);
-                } else {
-                    ctx.lineTo(px, py);
-                }
-            });
-
-            ctx.stroke();
-        }
-
-        function drawEmptyTrace(ctx, x, y, width, height) {
-            return;
-        }
-
-        function decodePolyline(str) {
-            let index = 0, lat = 0, lng = 0;
-            const coordinates = [];
-            let shift = 0, result = 0, byte = null;
-
-            while (index < str.length) {
-                byte = null;
-                shift = 0;
-                result = 0;
-
-                do {
-                    byte = str.charCodeAt(index++) - 63;
-                    result |= (byte & 0x1f) << shift;
-                    shift += 5;
-                } while (byte >= 0x20);
-
-                const deltaLat = ((result & 1) ? ~(result >> 1) : (result >> 1));
-                lat += deltaLat;
-
-                shift = 0;
-                result = 0;
-
-                do {
-                    byte = str.charCodeAt(index++) - 63;
-                    result |= (byte & 0x1f) << shift;
-                    shift += 5;
-                } while (byte >= 0x20);
-
-                const deltaLng = ((result & 1) ? ~(result >> 1) : (result >> 1));
-                lng += deltaLng;
-
-                coordinates.push([lat / 1e5, lng / 1e5]);
-            }
-
-            return coordinates;
-        }
-
-        // Fonctions de partage et sauvegarde
-        function saveToGallery() {
-            if (!generatedImageUrl) {
-                showError('Aucun visuel généré à sauvegarder');
-                return;
-            }
-
-            const link = document.createElement('a');
-            link.download = `strava-recap-${new Date().toISOString().slice(0, 10)}.png`;
-            link.href = generatedImageUrl;
-            link.click();
-        }
-
-        function downloadImage(format) {
-            if (!generatedImageUrl) {
-                showError('Aucun visuel généré à télécharger');
-                return;
-            }
-
-            const canvas = document.getElementById('recapCanvas');
-            const link = document.createElement('a');
-            
-            if (format === 'png') {
-                link.download = `strava-recap-${new Date().toISOString().slice(0, 10)}.png`;
-                link.href = canvas.toDataURL();
-            } else {
-                link.download = `strava-recap-${new Date().toISOString().slice(0, 10)}.jpg`;
-                link.href = canvas.toDataURL('image/jpeg', 0.9);
-            }
-            
-            link.click();
-        }
-
-        function shareToInstagram() {
-            if (!generatedImageUrl) {
-                showError('Générez d\'abord votre visuel');
-                return;
-            }
-
-            // Vérifier si on est sur mobile
-            if (/Android|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
-                // Tenter d'ouvrir l'app Instagram
-                window.open('instagram://story-camera', '_blank');
-                
-                // Fallback: télécharger l'image
-                setTimeout(() => {
-                    downloadImage('png');
-                }, 1000);
-            } else {
-                // Sur desktop, télécharger l'image avec instructions
-                downloadImage('png');
-                alert('Image téléchargée ! Vous pouvez maintenant l\'importer dans vos stories Instagram depuis votre téléphone.');
-            }
-        }
-
-        function shareToTwitter() {
-            const text = encodeURIComponent('Mon récapitulatif Strava du mois ! 🚴‍♂️📊 #Strava #Cycling #Running #Fitness #StravaStories');
-            const url = 'https://twitter.com/intent/tweet?text=' + text;
-            
-            downloadImage('png');
-            window.open(url, '_blank', 'width=600,height=400');
-        }
-
-        function shareToFacebook() {
-            const url = encodeURIComponent(window.location.href);
-            const shareUrl = `https://www.facebook.com/sharer/sharer.php?u=${url}`;
-            
-            downloadImage('png');
-            window.open(shareUrl, '_blank', 'width=600,height=400');
-        }
-
-        function shareGeneric() {
-            if (navigator.share && generatedImageUrl) {
-                // Convertir l'image en blob pour le partage natif
-                fetch(generatedImageUrl)
-                    .then(res => res.blob())
-                    .then(blob => {
-                        const file = new File([blob], 'strava-recap.png', { type: 'image/png' });
-                        
-                        navigator.share({
-                            title: 'Mon récapitulatif Strava',
-                            text: 'Regardez mon récapitulatif Strava du mois !',
-                            files: [file]
-                        });
-                    })
-                    .catch(() => {
-                        // Fallback si le partage échoue
-                        downloadImage('png');
-                    });
-            } else {
-                // Fallback pour les navigateurs qui ne supportent pas navigator.share
-                downloadImage('png');
-                
-                if (navigator.clipboard) {
-                    navigator.clipboard.writeText(window.location.href);
-                    alert('Lien copié ! Partagez votre récapitulatif avec vos amis.');
-                }
-            }
-        }
-
-        function showError(message) {
-            const errorDiv = document.getElementById('error');
-            errorDiv.textContent = message;
-            errorDiv.style.display = 'block';
-            
-            setTimeout(() => {
-                errorDiv.style.display = 'none';
-            }, 5000);
-        }
-    </script>
-</body>
-</html>
+                return
