@@ -1039,13 +1039,17 @@
 
             let minLat = points[0][0], maxLat = points[0][0];
             let minLng = points[0][1], maxLng = points[0][1];
-            
+
             points.forEach(point => {
                 minLat = Math.min(minLat, point[0]);
                 maxLat = Math.max(maxLat, point[0]);
                 minLng = Math.min(minLng, point[1]);
                 maxLng = Math.max(maxLng, point[1]);
             });
+
+            // Avoid division by zero when the activity has no spread in latitude or longitude
+            const latRange = Math.max(maxLat - minLat, 1e-6);
+            const lngRange = Math.max(maxLng - minLng, 1e-6);
 
             const padding = size * 0.1;
             const drawWidth = size - 2 * padding;
@@ -1058,9 +1062,9 @@
             ctx.beginPath();
 
             points.forEach((point, index) => {
-                const px = x + padding + ((point[1] - minLng) / (maxLng - minLng)) * drawWidth;
-                const py = y + padding + ((maxLat - point[0]) / (maxLat - minLat)) * drawHeight;
-                
+                const px = x + padding + ((point[1] - minLng) / lngRange) * drawWidth;
+                const py = y + padding + ((maxLat - point[0]) / latRange) * drawHeight;
+
                 if (index === 0) {
                     ctx.moveTo(px, py);
                 } else {
